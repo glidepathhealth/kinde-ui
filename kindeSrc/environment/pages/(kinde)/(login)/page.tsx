@@ -10,7 +10,7 @@ import { Root } from "../../../../root";
 const LoginPage: React.FC<KindePageEvent> = ({ context, request }) => {
   return (
     <Root context={context} request={request}>
-      <DefaultLayout>
+      <DefaultLayout logoAlt={context.widget.content.logo_alt} variant="login">
         <Widget
           heading={context.widget.content.heading}
           description={context.widget.content.description}
