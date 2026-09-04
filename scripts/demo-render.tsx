@@ -37,10 +37,30 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = resolve(root, ".context/demo");
 mkdirSync(out, { recursive: true });
 
-const kindeCss = readFileSync(
-  resolve(root, ".context/kinde/kinde-required.css"),
-  "utf8",
-);
+/**
+ * Kinde's shipped widget stylesheet. It is not committed — it is their CSS, not
+ * ours — so a fresh clone has to fetch it once. Point KINDE_CSS at your own copy
+ * to override the default location.
+ */
+const kindeCssPath = process.env.KINDE_CSS
+  ? resolve(process.env.KINDE_CSS)
+  : resolve(root, ".context/kinde/kinde-required.css");
+
+let kindeCss: string;
+try {
+  kindeCss = readFileSync(kindeCssPath, "utf8");
+} catch {
+  console.error(
+    `\nMissing Kinde's stylesheet at ${kindeCssPath}\n\n` +
+      `The preview renders against Kinde's real CSS, which is not committed.\n` +
+      `Fetch it once from any Kinde-hosted auth page:\n\n` +
+      `  mkdir -p .context/kinde\n` +
+      `  curl -s https://<your-kinde-domain>/dist/end_user_ui/assets/css/style.css \\\n` +
+      `    -o .context/kinde/kinde-required.css\n\n` +
+      `Then re-run \`npm run demo\`. (\`npm test\` needs none of this.)\n`,
+  );
+  process.exit(1);
+}
 
 /**
  * Google's official "G" mark. Kinde supplies the real one at runtime; this copy
