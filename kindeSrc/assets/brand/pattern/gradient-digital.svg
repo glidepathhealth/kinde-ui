@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 1920 1080">
+  <!-- Generator: Adobe Illustrator 30.4.0, SVG Export Plug-In . SVG Version: 2.1.4 Build 226)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: url(#linear-gradient);
+      }
+
+      .st1 {
+        fill: url(#linear-gradient1);
+        isolation: isolate;
+        opacity: .8;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="960" y1="22.7" x2="960" y2="1059.8" gradientTransform="translate(0 1080) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#858dec"/>
+      <stop offset=".3" stop-color="#5158ad"/>
+      <stop offset=".5" stop-color="#292f7d"/>
+      <stop offset=".6" stop-color="#1a206b"/>
+      <stop offset="1" stop-color="#0b062d"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient1" x1="960" y1="11.3" x2="960" y2="529.9" gradientTransform="translate(0 1080) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ed6f48"/>
+      <stop offset=".1" stop-color="#ed6f48" stop-opacity=".8"/>
+      <stop offset=".3" stop-color="#ed6f48" stop-opacity=".5"/>
+      <stop offset=".5" stop-color="#ed6f48" stop-opacity=".3"/>
+      <stop offset=".6" stop-color="#ed6f48" stop-opacity=".2"/>
+      <stop offset=".8" stop-color="#ed6f48" stop-opacity="0"/>
+      <stop offset=".9" stop-color="#ed6f48" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ed6f48" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect class="st0" width="1920" height="1080"/>
+  <rect class="st1" y="540" width="1920" height="540"/>
+</svg>
