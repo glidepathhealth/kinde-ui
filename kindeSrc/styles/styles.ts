@@ -178,6 +178,12 @@ export const getStyles = (): string => `
     --kinde-alert-banner-error-border-color: ${brand.horizon};
     --kinde-alert-banner-error-color: ${brand.horizonAccessible};
     --kinde-alert-banner-border-radius: 0.25rem;
+    /* The info variant overrides the error colours with its own set. Branding
+     * only the error one left "we sent you a code" rendering in Kinde's stock
+     * blue while carrying the new radius — half-branded rather than deliberate. */
+    --kinde-alert-banner-info-background-color: ${brand.duskTint12};
+    --kinde-alert-banner-info-border-color: ${brand.duskTint30};
+    --kinde-alert-banner-info-color: ${brand.midnight};
 
     --kinde-shared-color-invalid: ${brand.horizonAccessible};
     --kinde-shared-color-text-label: ${brand.midnight};

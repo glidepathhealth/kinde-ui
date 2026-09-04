@@ -16,5 +16,6 @@
     "demo": "tsx scripts/demo-render.tsx",
     "assets": "node scripts/build-brand-assets.mjs"
   },
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "name": "glidepath-kinde-ui"
 }

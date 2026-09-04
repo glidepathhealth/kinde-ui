@@ -57,7 +57,7 @@ repository was forked from.
 - The decorative arrow on the forgot-password link points the right way in
   right-to-left locales.
 - The page canvas is Midnight rather than transparent, so iOS elastic overscroll
-  and printing no longer show a white band.
+  no longer shows a white band against the gradient.
 - `npm run demo` explains what to do when Kinde's stylesheet is missing instead
   of failing with a stack trace. It is not committed, so a fresh clone has to
   fetch it once; `npm test` needs nothing extra.

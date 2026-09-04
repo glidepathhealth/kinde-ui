@@ -192,11 +192,19 @@ check("Area leads the font stack, Figtree is the fallback", () => {
   assert(/Figtree/.test(stack), "Figtree fallback missing from the stack");
 });
 
-check("logo renders at or above the 125px brand minimum", () => {
-  const m = css.match(/\.gph-header img\s*\{[^}]*?width:\s*([\d.]+)rem/);
-  assert(m, ".gph-header img width not found");
-  const px = parseFloat(m![1]) * 16;
-  assert(px >= 125, `logo is ${px}px wide, brand minimum is 125px`);
+check("logo renders at or above the 125px brand minimum at every breakpoint", () => {
+  // Every .gph-header img width, not just the first. The mobile override lives
+  // in a media query further down, and mobile is exactly where a logo gets
+  // shrunk toward the floor this check exists to defend.
+  const widths = [...css.matchAll(/\.gph-header img\s*\{[^}]*?width:\s*([\d.]+)rem/g)].map(
+    (m) => parseFloat(m[1]) * 16,
+  );
+  assert(widths.length >= 2, `expected a desktop and a mobile rule, found ${widths.length}`);
+  const tooSmall = widths.filter((px) => px < 125);
+  assert(
+    tooSmall.length === 0,
+    `logo drops to ${tooSmall.join(", ")}px; the brand minimum is 125px`,
+  );
 });
 
 check("every Kinde placeholder in the output is one Kinde will substitute", () => {
@@ -271,8 +279,19 @@ check("the fixes from the adversarial review stay fixed", () => {
   );
   assert(token("card-padding") !== "0", "card padding zeroed again");
 
-  // Error banner was stock maroon beside branded inline field errors.
-  assert(token("alert-banner-error-color"), "alert banner colour unset: reverts to Kinde maroon");
+  // Error banner was stock maroon beside branded inline field errors, and the
+  // info variant overrides those colours with its own set — branding one and not
+  // the other puts Kinde's stock blue on the same card as the branded red.
+  for (const t of [
+    "alert-banner-error-background-color",
+    "alert-banner-error-border-color",
+    "alert-banner-error-color",
+    "alert-banner-info-background-color",
+    "alert-banner-info-border-color",
+    "alert-banner-info-color",
+  ]) {
+    assert(token(t), `--kinde-${t} unset: that banner variant reverts to Kinde's stock colours`);
+  }
 
   // transparent left the canvas UA-white on overscroll and in print.
   assert(
