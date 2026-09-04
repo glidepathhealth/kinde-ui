@@ -3,48 +3,20 @@
 import { getKindeWidget } from "@kinde/infrastructure";
 import React from "react";
 
-const styles: {
-  container: React.CSSProperties;
-  heading: React.CSSProperties;
-  description: React.CSSProperties;
-} = {
-  container: {
-    minHeight: "100vh",
-    color: "#fff",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    background:
-      "url(https://asset.kindedemo.com/evolve-ai/bg.png) lightgray 50% / cover no-repeat",
-  },
-
-  heading: {
-    alignSelf: "stretch",
-    color: "#F5F5F5",
-    fontSize: "32px",
-    fontStyle: "normal",
-    fontWeight: 500,
-    lineHeight: "32px" /* 100% */,
-    letterSpacing: "-0.64px",
-    textAlign: "center",
-  },
-  description: {
-    marginBottom: "1.5rem",
-  },
-};
-
+/**
+ * The white card. Heading and description strings come from Kinde
+ * (`context.widget.content`) and are edited in the Kinde dashboard under
+ * Design > Content, not here — so casing is set there, not in code.
+ *
+ * `getKindeWidget()` renders the form itself. It is styled through the style
+ * hooks in styles.ts rather than from this component.
+ */
 export const Widget = (props: { heading: string; description: string }) => {
   return (
-    <main className="login-form">
-      <div
-        style={{
-          width: "100%",
-        }}
-      >
-        <h1 style={styles.heading}>{props.heading}</h1>
-        <p style={styles.description}>{props.description}</p>
-        {getKindeWidget()}
-      </div>
-    </main>
+    <div className="gph-card">
+      <h1 className="gph-card__heading">{props.heading}</h1>
+      <p className="gph-card__description">{props.description}</p>
+      {getKindeWidget()}
+    </div>
   );
 };

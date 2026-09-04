@@ -6,6 +6,16 @@
   },
   "devDependencies": {
     "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.2.7",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.3"
-  }
+  },
+  "scripts": {
+    "test": "tsx scripts/verify.tsx",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx scripts/demo-render.tsx",
+    "assets": "node scripts/build-brand-assets.mjs"
+  },
+  "version": "0.1.0",
+  "name": "glidepath-kinde-ui"
 }
