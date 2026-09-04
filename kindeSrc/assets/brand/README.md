@@ -19,9 +19,15 @@ pattern/
   glide-path-white.svg             Glide Path line pattern, white strokes
   glide-path-midnight.svg          Glide Path line pattern, midnight strokes
 fonts/
-  Figtree-VariableFont_wght.ttf    fallback brand font (OFL, see OFL.txt)
+  Figtree-latin.woff2              embedded into the stylesheet by npm run assets
+  Figtree-latin-ext.woff2
+  Figtree-VariableFont_wght.ttf    full variable font, for design tools
   Figtree-Italic-VariableFont_wght.ttf
+  OFL.txt                          Figtree's licence
 ```
+
+`../ui/` holds interface glyphs this repo draws itself (the link arrow). Those
+are not brand assets and are not covered by the no-redraw rule.
 
 ## Colour tokens
 
@@ -41,10 +47,23 @@ contrast is short.
 
 ## Type
 
-Primary is **Area** (Adobe Fonts, subscription — not redistributable, so it is
-not in this repo). Fallback chain: Area → Figtree → Tenorite → Arial. To use
-Area on the hosted Kinde pages you need an Adobe Fonts *web project* and its
-`<link>`/CSS URL; until then Figtree is the sanctioned substitute.
+**Figtree**, matching the product app, embedded as base64 woff2.
+
+The brand guide's primary typeface is **Area** (Adobe Fonts, subscription, not
+redistributable). It cannot be used on the hosted auth pages at all: those pages
+do not load cross-origin subresources, so an Adobe Fonts web project would never
+resolve. Figtree is the guide's sanctioned fallback and is what renders.
+
+Two constraints the CSS has to respect, both measured against the live dev page:
+
+- **The font must be embedded, not hotlinked.** A `FontFace` pointing at
+  `fonts.gstatic.com` fails on the auth origin and succeeds from anywhere else.
+  A CDN URL leaves the page on the browser default serif.
+- **No quote characters anywhere in the stylesheet.** Kinde HTML-escapes it, and
+  the `;` inside the resulting `&quot;` terminates whatever declaration it lands
+  in. That means no quoted family names (so no `"Segoe UI"`), no `format('woff2')`,
+  no `content: "→"`, no quoted `url()`, and no quoted attribute selectors.
+  `npm test` fails on any quote in the output.
 
 Headings: ExtraBold/Bold, Title Case, leading 120–135%. Body: Regular/Medium,
 Sentence case, leading 145–160%. Web starting points: H1 32–36px, body 16–18px,

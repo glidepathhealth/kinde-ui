@@ -2,6 +2,32 @@
 
 All notable changes to the Glidepath Health Kinde custom UI.
 
+## [0.1.1.0] - 2026-09-04
+
+### Fixed
+
+Everything below is one root cause. Kinde HTML-escapes the custom stylesheet
+before serving it, and the `;` inside the resulting `&quot;` terminates whatever
+CSS declaration it lands in. Single quotes are escaped too. Every quoted
+construct in the stylesheet was therefore destroyed in transit, which on the dev
+login page meant:
+
+- **The font.** The stack ended in `"Segoe UI"`, so the declaration truncated
+  mid-value and every page fell back to the browser default serif. It is now
+  Figtree, matching the product app, with no quotable family in the stack.
+- **Figtree never loaded anyway.** `format('woff2')` broke the `@font-face`
+  rule, and the auth origin does not load cross-origin fonts, so the Google
+  CDN URL could not have worked either. Figtree is now embedded as base64 woff2.
+- **The Glide Path pattern.** It rode on a pseudo-element needing
+  `content: ""`, which the escaping made invalid, so the layer never rendered at
+  all — and its `url("data:…")` was reparsed as a relative URL. It is now a real
+  element with an unquoted URL.
+- **The link arrow and the social-button and RTL rules**, all of which used
+  quoted strings or quoted attribute selectors.
+
+`npm test` now fails on any quote character in the emitted CSS, and on a
+`@font-face` that points at a remote URL.
+
 ## [0.1.0.0] - 2026-09-03
 
 First Glidepath-branded release. Replaces the Evolve.ai starter theme the

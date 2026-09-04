@@ -1,4 +1,10 @@
-import { glidePathWhite } from "../assets/brand-assets";
+import {
+  arrowLeft,
+  arrowRight,
+  figtreeLatin,
+  figtreeLatinExt,
+  glidePathWhite,
+} from "../assets/brand-assets";
 
 /**
  * Glidepath Health design tokens.
@@ -27,13 +33,19 @@ const brand = {
 } as const;
 
 /**
- * Area is the primary typeface but ships via Adobe Fonts, which is a licensed
- * subscription — the files cannot live in this repo. It is kept first in the
- * stack so that adding an Adobe Fonts web project later upgrades every page
- * with no code change. Figtree is the guide's sanctioned fallback and is what
- * actually renders today.
+ * Figtree, matching the product app.
+ *
+ * No quoted family names, and no family whose name needs quoting. Kinde
+ * HTML-escapes this stylesheet before serving it, and the `;` inside the
+ * resulting `&quot;` terminates the declaration early — a stack ending in
+ * "Segoe UI" truncated mid-value and every page fell back to the browser
+ * default serif. scripts/verify.tsx now fails on any quote in the output.
+ *
+ * Area is the brand guide's primary typeface but ships via Adobe Fonts, and the
+ * auth origin does not load cross-origin fonts, so it cannot be served here at
+ * all. Figtree is the guide's sanctioned fallback.
  */
-const fontStack = `Area, Figtree, Tenorite, Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+const fontStack = `Figtree, Helvetica, Arial, sans-serif`;
 
 const scale = {
   heading: "2rem", // 32px — guide's web H1 range is 32-36px
@@ -44,16 +56,20 @@ const scale = {
 
 export const getStyles = (): string => `
   /*
-   * Figtree, served from Google's font CDN. Kinde does not host static assets,
-   * so this points at an external origin; move it to assets.glidepathhealth.com
-   * when that host exists, as Kinde recommends.
+   * Figtree, embedded. The Kinde auth origin does not load cross-origin
+   * subresources — a FontFace pointing at fonts.gstatic.com fails there and the
+   * same load succeeds from any other origin — so a hotlinked CDN font silently
+   * leaves the page on the browser default serif.
+   *
+   * No format() descriptor: it requires a quoted string and browsers sniff the
+   * format from the data URI anyway.
    */
   @font-face {
     font-family: Figtree;
     font-style: normal;
     font-weight: 300 900;
     font-display: swap;
-    src: url(https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DaRvzig.woff2) format('woff2');
+    src: url(${figtreeLatin});
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
   @font-face {
@@ -61,7 +77,7 @@ export const getStyles = (): string => `
     font-style: normal;
     font-weight: 300 900;
     font-display: swap;
-    src: url(https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4q9DaRvziissg.woff2) format('woff2');
+    src: url(${figtreeLatinExt});
     unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
   }
 
@@ -229,11 +245,15 @@ export const getStyles = (): string => `
     background-repeat: no-repeat;
   }
 
-  .gph-page::before {
-    content: "";
+  /*
+   * A real element, not ::before. The pseudo-element needed content: "" and the
+   * escaped &quot;&quot; made that declaration invalid, so the whole layer never
+   * rendered and the page showed a bare gradient with no Glide Path lines.
+   */
+  .gph-page__pattern {
     position: absolute;
     inset: 0;
-    background-image: url("${glidePathWhite}");
+    background-image: url(${glidePathWhite});
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -241,7 +261,12 @@ export const getStyles = (): string => `
     pointer-events: none;
   }
 
-  .gph-page > * { position: relative; }
+  /*
+   * Lifts the content above the pattern layer. It must exclude the pattern
+   * itself: same specificity and later in source, so it was winning and
+   * collapsing the absolutely-positioned layer to zero height.
+   */
+  .gph-page > *:not(.gph-page__pattern) { position: relative; }
 
   /* -------------------------------------------------------------- header -- */
   .gph-header {
@@ -380,11 +405,11 @@ export const getStyles = (): string => `
     gap: 0.75rem;
   }
 
-  [data-kinde-button-variant="secondary"] {
+  [data-kinde-button-variant=secondary] {
     font-weight: 600;
   }
 
-  [data-kinde-button-variant="secondary"]:hover {
+  [data-kinde-button-variant=secondary]:hover {
     border-color: ${brand.dawn};
   }
 
@@ -443,15 +468,21 @@ export const getStyles = (): string => `
   }
 
   /* The trailing arrow on the link, as drawn in the Figma frame. Decorative, so
-   * it is a pseudo-element rather than link text a screen reader would announce. */
+   * it is a pseudo-element rather than link text a screen reader would announce.
+   *
+   * An SVG rather than content: "\\2192" because a quoted CSS string does not
+   * survive Kinde's HTML escaping. url(data:...) unquoted does. */
   .gph-page--login [data-kinde-layout-button-group] [data-kinde-text-link]::after {
-    content: " \\2192";
+    content: url(${arrowRight});
+    display: inline-block;
+    vertical-align: -0.125em;
+    margin-inline-start: 0.5rem;
   }
 
   /* The arrow points away from the text, so it has to flip with the text.
    * root.tsx sets dir on <html> from request.locale.isRtl. */
-  [dir="rtl"] .gph-page--login [data-kinde-layout-button-group] [data-kinde-text-link]::after {
-    content: " \\2190";
+  [dir=rtl] .gph-page--login [data-kinde-layout-button-group] [data-kinde-text-link]::after {
+    content: url(${arrowLeft});
   }
 
   /* ------------------------------------------------------------- mobile -- */

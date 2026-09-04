@@ -25,6 +25,13 @@ export const DefaultLayout: React.FC<LayoutProps> = ({
 }) => {
   return (
     <div className={variant ? `gph-page gph-page--${variant}` : "gph-page"}>
+      {/*
+       * The Glide Path pattern is a real element rather than a ::before, because
+       * a pseudo-element needs `content: ""` and Kinde HTML-escapes the
+       * stylesheet — the escaped quotes made that declaration invalid and the
+       * whole layer silently vanished.
+       */}
+      <div className="gph-page__pattern" aria-hidden="true" />
       <Header logoAlt={logoAlt} />
       <main className="gph-main">{children}</main>
       <Footer />
