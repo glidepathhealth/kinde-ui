@@ -32,7 +32,13 @@ export const Root = ({
         <link href={getSVGFaviconUrl()} rel="icon" type="image/svg+xml" />
         {getKindeRequiredCSS()}
         {getKindeRequiredJS()}
-        <style>{getStyles()}</style>
+        {/*
+          * dangerouslySetInnerHTML, not a text child: it is the correct way to
+          * inline CSS in React and keeps the stylesheet out of any escaping
+          * path. Kinde escapes the served HTML regardless, which is why
+          * styles.ts is written without a single quote character.
+          */}
+        <style dangerouslySetInnerHTML={{ __html: getStyles() }} />
       </head>
 
       <body>

@@ -21,9 +21,36 @@ const assets = {
   glidePathWhite: "pattern/glide-path-white.svg",
 };
 
-const body = Object.entries(assets)
-  .map(([name, rel]) => `// ${rel}\nexport const ${name} = "${dataUri(rel)}";`)
-  .join("\n\n");
+// Figtree has to travel with the page too. The Kinde auth origin does not load
+// cross-origin fonts (measured: a FontFace from fonts.gstatic.com fails there and
+// succeeds from any other origin), so hotlinking a CDN leaves the page on the
+// browser default serif.
+// Interface glyphs this repo draws itself, kept apart from the brand kit.
+const ui = {
+  arrowRight: "../ui/arrow-right.svg",
+  arrowLeft: "../ui/arrow-left.svg",
+};
+
+const fonts = {
+  figtreeLatin: "fonts/Figtree-latin.woff2",
+  figtreeLatinExt: "fonts/Figtree-latin-ext.woff2",
+};
+
+const fontUri = (rel) =>
+  "data:font/woff2;base64," +
+  readFileSync(resolve(root, "kindeSrc/assets/brand", rel)).toString("base64");
+
+const body = [
+  ...Object.entries(assets).map(
+    ([name, rel]) => `// ${rel}\nexport const ${name} = "${dataUri(rel)}";`,
+  ),
+  ...Object.entries(ui).map(
+    ([name, rel]) => `// ui/${rel.replace("../ui/", "")}\nexport const ${name} = "${dataUri(rel)}";`,
+  ),
+  ...Object.entries(fonts).map(
+    ([name, rel]) => `// ${rel}\nexport const ${name} = "${fontUri(rel)}";`,
+  ),
+].join("\n\n");
 
 const out = resolve(root, "kindeSrc/assets/brand-assets.ts");
 const expected =

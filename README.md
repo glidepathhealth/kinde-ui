@@ -111,9 +111,18 @@ and the known contrast failures. Read it before changing a colour.
 
 Two rules worth repeating here. The logo and the Glide Path pattern are never
 redrawn or AI-generated, only composited from the files in that directory. And
-the primary typeface is Area, which is licensed through Adobe Fonts and cannot
-live in this repo, so Figtree renders today and Area activates through an Adobe
-Fonts web project with no code change.
+the typeface is Figtree, matching the product app, embedded in the stylesheet as
+base64 woff2.
+
+Two constraints on `kindeSrc/styles/styles.ts` that are not obvious and that
+`npm test` enforces:
+
+- **No quote characters in the emitted CSS.** Kinde HTML-escapes the stylesheet
+  before serving it, and the `;` inside the resulting `&quot;` terminates
+  whatever declaration it lands in. Use unquoted `url(data:…)`, unquoted
+  attribute selectors, and font families whose names need no quoting.
+- **Subresources must be embedded, not linked.** The auth origin does not load
+  cross-origin fonts, images, or stylesheets, so a CDN URL silently fails.
 
 ## Known gaps
 

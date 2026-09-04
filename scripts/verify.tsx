@@ -151,7 +151,7 @@ check("stylesheet uses only brand palette colours", () => {
   // comments (which legitimately name Kinde's defaults when explaining why a
   // setting is overridden). Only colours that actually render are in scope.
   const sheet = css
-    .replace(/url\("data:[^"]*"\)/g, "")
+    .replace(/url\(\s*"?data:[^)]*"?\s*\)/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "");
   const norm = (r: number, g: number, b: number) =>
     "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
@@ -184,12 +184,52 @@ check("stylesheet uses only brand palette colours", () => {
   assert(offPalette.length === 0, `off-palette colours: ${offPalette.join(", ")}`);
 });
 
-check("Area leads the font stack, Figtree is the fallback", () => {
+check("the emitted CSS contains no quote characters at all", () => {
+  // The load-bearing check. Kinde HTML-escapes this stylesheet before serving
+  // it, and the `;` inside the resulting `&quot;` terminates whatever
+  // declaration it lands in. On dev that silently cost us the font (truncated
+  // stack -> browser default serif), the entire Glide Path layer (`content: ""`
+  // invalid, so the element never rendered), the background image
+  // (url("data:...") reparsed as a relative URL), and every quoted attribute
+  // selector. Single quotes are escaped too, so neither kind is safe.
+  //
+  // Comments are exempt: the parser consumes them whole, so an escaped quote
+  // inside one cannot break a declaration.
+  const functional = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const offenders = functional
+    .split("\n")
+    .map((l, i) => [i + 1, l] as const)
+    .filter(([, l]) => /["']/.test(l));
+  assert(
+    offenders.length === 0,
+    `quotes do not survive Kinde's escaping; found on line(s) ${offenders
+      .map(([n, l]) => `${n}: ${l.trim().slice(0, 60)}`)
+      .join(" | ")}`,
+  );
+});
+
+check("Figtree is the font and it is embedded, not hotlinked", () => {
   const m = css.match(/--kinde-base-font-family:\s*([^;]+);/);
   assert(m, "--kinde-base-font-family not set");
   const stack = m![1];
-  assert(/^\s*Area\s*,/.test(stack), `Area must lead the stack, got: ${stack}`);
-  assert(/Figtree/.test(stack), "Figtree fallback missing from the stack");
+  assert(/^\s*Figtree\s*,/.test(stack), `Figtree must lead the stack, got: ${stack}`);
+  // Every family in the stack must be quote-free, or the declaration truncates.
+  for (const family of stack.split(",").map((f) => f.trim())) {
+    assert(
+      /^[A-Za-z-][A-Za-z0-9 -]*$/.test(family),
+      `font family needs quoting and so cannot be used here: ${family}`,
+    );
+  }
+  // The auth origin does not load cross-origin subresources, so a CDN URL here
+  // would leave the page on the browser default serif.
+  const faces = [...css.matchAll(/@font-face\s*\{[^}]*\}/g)].map((x) => x[0]);
+  assert(faces.length >= 1, "no @font-face rule: Figtree would never load");
+  for (const face of faces) {
+    assert(
+      /src:\s*url\(data:font/.test(face),
+      "@font-face must embed the font; a remote URL does not load on the auth origin",
+    );
+  }
 });
 
 check("logo renders at or above the 125px brand minimum at every breakpoint", () => {
@@ -228,6 +268,7 @@ check("every Kinde placeholder in the output is one Kinde will substitute", () =
     );
     assert(stray.length === 0, `unknown placeholders would ship literally: ${stray.join(", ")}`);
     assert(html.includes("gph-card"), "card wrapper missing");
+    assert(html.includes("gph-page__pattern"), "Glide Path layer missing from the markup");
     assert(html.includes('lang="en"'), "lang attribute missing");
   }
 });
@@ -301,15 +342,43 @@ check("the fixes from the adversarial review stay fixed", () => {
 
   // The Kinde attribution renders inside the white card; nothing may paint it white.
   assert(!/kinde-branding/.test(css), "styling Kinde's attribution made its logo invisible once");
+
+  // The Glide Path layer must stay a real element. As a ::before it needed
+  // content: "" and vanished entirely once Kinde escaped the quotes.
+  assert(
+    /\.gph-page__pattern\s*\{/.test(css),
+    "the Glide Path layer lost its own rule",
+  );
+  assert(
+    !/\.gph-page::before/.test(css),
+    "the pattern moved back to a pseudo-element, which needs an escapable content",
+  );
+  // The pattern is absolutely positioned; a blanket child rule that also sets
+  // position wins on source order and collapses it to zero height.
+  const childRule = css.match(/\.gph-page > \*[^{]*\{[^}]*position[^}]*\}/);
+  if (childRule) {
+    assert(
+      /:not\(\.gph-page__pattern\)/.test(childRule[0]),
+      "a .gph-page > * rule sets position without excluding the pattern, which collapses it",
+    );
+  }
 });
 
 check("the RTL locale flips direction and the decorative arrow", () => {
   const html = renderPage(undefined, { isRtl: true });
   assert(/<html[^>]*dir="rtl"/.test(html), "dir=rtl not emitted for an RTL locale");
   assert(/<html[^>]*dir="ltr"/.test(renderPage()), "dir=ltr not emitted for an LTR locale");
+  const rtlRule = css.match(/\[dir=rtl\][^{]*\{[^}]*\}/);
+  assert(rtlRule, "no [dir=rtl] rule at all");
+  const ltrRule = css.match(
+    /\.gph-page--login \[data-kinde-layout-button-group\] \[data-kinde-text-link\]::after\s*\{[^}]*\}/,
+  );
+  assert(ltrRule, "no LTR arrow rule");
+  const uri = (r: string) => r.match(/url\((data:[^)]*)\)/)?.[1];
+  assert(uri(rtlRule![0]), "the RTL rule no longer swaps the arrow glyph");
   assert(
-    css.includes('[dir="rtl"]') && css.includes("\\2190"),
-    "no RTL rule flipping the link arrow, which otherwise points into the text",
+    uri(ltrRule![0]) !== uri(rtlRule![0]),
+    "LTR and RTL use the same arrow glyph; one of them points the wrong way",
   );
 });
 
