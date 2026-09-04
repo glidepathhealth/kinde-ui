@@ -46,6 +46,15 @@ Move it to `assets.glidepathhealth.com` when that exists.
 designates the secondary boxed-icon logo for favicon and platform identity;
 the file is in the brand kit but not yet wired up.
 
+### Delete the orphaned Evolve.ai screenshot
+
+**Priority:** P3
+
+`image.png` in the repo root is the Evolve.ai starter template's screenshot, 2MB
+of a theme that no longer exists here. The README stopped referencing it in
+v0.1.0.0, so nothing points at it. Delete it, or replace it with a current
+screenshot of the branded login page and reference that from the README.
+
 ### Accessibility pass on the card
 
 **Priority:** P2
