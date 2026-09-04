@@ -57,7 +57,7 @@ const assert = (cond: unknown, msg: string) => {
 
 const css = getStyles();
 
-const renderPage = (variant?: string) => {
+const renderPage = (variant?: string, opts: { isRtl?: boolean } = {}) => {
   const context = {
     widget: {
       content: {
@@ -69,7 +69,7 @@ const renderPage = (variant?: string) => {
     },
   } as unknown as KindePageEvent["context"];
   const request = {
-    locale: { lang: "en", isRtl: false },
+    locale: { lang: "en", isRtl: opts.isRtl ?? false },
   } as unknown as KindePageEvent["request"];
   return renderToStaticMarkup(
     <Root context={context} request={request}>
@@ -102,10 +102,12 @@ check("styles.ts template literal is not truncated by a stray backtick", () => {
     backticks % 2 === 0,
     `odd number of backticks (${backticks}) — a CSS comment probably contains one`,
   );
-  // The last rule in the sheet must survive to the end.
+  // Anchor on a sentinel kept last in styles.ts. Asserting a rule that happens
+  // to sit mid-sheet leaves everything after it unprotected — .gph-footer was
+  // at 66% once the social sign-in and login rules landed below it.
   assert(
-    css.includes(".gph-footer"),
-    "stylesheet is truncated: .gph-footer missing from getStyles() output",
+    css.includes("gph-end-of-stylesheet"),
+    "stylesheet is truncated: the end-of-sheet sentinel is missing",
   );
   assert(css.length > 4000, `stylesheet suspiciously short (${css.length} chars)`);
 });
@@ -119,14 +121,11 @@ check("no Kinde-internal class selectors (only documented style hooks)", () => {
 });
 
 check("brand-assets.ts is in sync with the source SVGs", () => {
-  const before = read("kindeSrc/assets/brand-assets.ts");
-  execFileSync("node", [resolve(root, "scripts/build-brand-assets.mjs")], {
+  // --check compares without writing. Regenerating first would repair the drift
+  // it is meant to detect, so the check passed on every run after the first.
+  execFileSync("node", [resolve(root, "scripts/build-brand-assets.mjs"), "--check"], {
     stdio: "pipe",
   });
-  assert(
-    read("kindeSrc/assets/brand-assets.ts") === before,
-    "brand-assets.ts is stale — run `node scripts/build-brand-assets.mjs` and commit",
-  );
 });
 
 check("the official logo and Glide Path artwork are embedded, not redrawn", () => {
@@ -154,8 +153,34 @@ check("stylesheet uses only brand palette colours", () => {
   const sheet = css
     .replace(/url\("data:[^"]*"\)/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "");
-  const hexes = [...new Set((sheet.match(/#[0-9a-fA-F]{6}\b/g) ?? []).map((h) => h.toLowerCase()))];
-  const offPalette = hexes.filter((h) => !palette.has(h));
+  const norm = (r: number, g: number, b: number) =>
+    "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+
+  const found = new Set<string>();
+  // 6- and 3-digit hex (8-digit is 6-digit plus alpha, so the prefix matches).
+  for (const h of sheet.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []) {
+    const x = h.slice(1).toLowerCase();
+    if (x.length === 3) found.add("#" + [...x].map((c) => c + c).join(""));
+    else if (x.length >= 6) found.add("#" + x.slice(0, 6));
+  }
+  // rgb()/rgba() — alpha is ignored; fully transparent is not a colour choice.
+  for (const m of sheet.matchAll(/rgba?\(([^)]*)\)/g)) {
+    const parts = m[1].split(/[,/\s]+/).filter(Boolean).map(Number);
+    const [r, g, b, a] = parts;
+    if ([r, g, b].some(Number.isNaN)) continue;
+    if (a === 0) continue;
+    found.add(norm(r, g, b));
+  }
+  // Anything else that renders a colour and would slip past the two above.
+  const exotic = sheet.match(/\b(hsla?|color-mix|lab|lch|oklch|oklab)\(/g) ?? [];
+  assert(
+    exotic.length === 0,
+    `unsupported colour syntax the palette check cannot verify: ${[...new Set(exotic)].join(", ")}`,
+  );
+  const named = sheet.match(/:\s*(red|blue|green|orange|purple|grey|gray|pink|yellow|teal|cyan|magenta)\s*[;!]/gi) ?? [];
+  assert(named.length === 0, `named CSS colours are off-palette: ${named.join(", ")}`);
+
+  const offPalette = [...found].filter((h) => !palette.has(h));
   assert(offPalette.length === 0, `off-palette colours: ${offPalette.join(", ")}`);
 });
 
@@ -216,6 +241,93 @@ check("the login row override is scoped to login only", () => {
   assert(pageClass() === "gph-page", `default: got "${pageClass()}"`);
 });
 
+check("the fixes from the adversarial review stay fixed", () => {
+  // Each of these guards a specific defect a reviewer found and measured.
+  const token = (name: string) => css.match(new RegExp(`--kinde-${name}:\\s*([^;]+);`))?.[1]?.trim();
+
+  // Long localised labels escaped the card until inline-size:auto got a clamp.
+  const btn = css.match(/\.gph-page--login \[data-kinde-layout-button-group\] \[data-kinde-button\]\s*\{[^}]*\}/);
+  assert(btn, "login button rule missing");
+  assert(/inline-size:\s*auto/.test(btn![0]), "content-width button rule changed shape");
+  assert(
+    /max-inline-size:\s*100%/.test(btn![0]),
+    "inline-size:auto without max-inline-size lets a long label overflow the card",
+  );
+
+  // In-flight submit repainted to Kinde's #ababab without these.
+  for (const t of [
+    "button-primary-background-color-loading",
+    "button-primary-color-loading",
+    "button-secondary-background-color-loading",
+    "button-secondary-color-loading",
+  ]) {
+    assert(token(t), `--kinde-${t} unset: the loading state falls back to Kinde grey`);
+  }
+
+  // Zeroing the card flattened the plan picker and org switcher.
+  assert(
+    parseFloat(token("card-border-width") ?? "0") > 0,
+    "card border zeroed again: plan picker and org switcher lose their separation",
+  );
+  assert(token("card-padding") !== "0", "card padding zeroed again");
+
+  // Error banner was stock maroon beside branded inline field errors.
+  assert(token("alert-banner-error-color"), "alert banner colour unset: reverts to Kinde maroon");
+
+  // transparent left the canvas UA-white on overscroll and in print.
+  assert(
+    token("base-background-color") !== "transparent",
+    "transparent canvas shows white on iOS overscroll and when printing",
+  );
+
+  // The Kinde attribution renders inside the white card; nothing may paint it white.
+  assert(!/kinde-branding/.test(css), "styling Kinde's attribution made its logo invisible once");
+});
+
+check("the RTL locale flips direction and the decorative arrow", () => {
+  const html = renderPage(undefined, { isRtl: true });
+  assert(/<html[^>]*dir="rtl"/.test(html), "dir=rtl not emitted for an RTL locale");
+  assert(/<html[^>]*dir="ltr"/.test(renderPage()), "dir=ltr not emitted for an LTR locale");
+  assert(
+    css.includes('[dir="rtl"]') && css.includes("\\2190"),
+    "no RTL rule flipping the link arrow, which otherwise points into the text",
+  );
+});
+
+check("Kinde's required CSS and JS both reach the page", () => {
+  const html = renderPage();
+  assert(html.includes(getKindeRequiredCSS()), "required CSS placeholder missing: widget renders unstyled");
+  assert(html.includes(getKindeRequiredJS()), "required JS placeholder missing: widget will not function");
+  assert(html.includes(getKindeCSRF()), "CSRF placeholder missing");
+  // Our stylesheet has to load after Kinde's so it can override the settings.
+  assert(
+    html.indexOf(getKindeRequiredCSS()) < html.indexOf("--kinde-base-font-family"),
+    "custom styles must come after getKindeRequiredCSS() to win the cascade",
+  );
+});
+
+check("the login page actually asks for the login variant", () => {
+  // renderPage() passes the variant directly, so it cannot catch the wiring
+  // being deleted from the page component. Check the real source.
+  const login = read("kindeSrc/environment/pages/(kinde)/(login)/page.tsx");
+  assert(/variant="login"/.test(login), "login page no longer passes variant=login");
+  for (const p of ["(register)", "(default)"]) {
+    const src = read(`kindeSrc/environment/pages/(kinde)/${p}/page.tsx`);
+    assert(!/variant="login"/.test(src), `${p} must not use the login variant`);
+  }
+});
+
+check("VERSION and package.json describe the same release", () => {
+  const v = read("VERSION").trim();
+  assert(/^\d+\.\d+\.\d+\.\d+$/.test(v), `VERSION is not 4-digit: ${v}`);
+  const pkg = JSON.parse(read("package.json")).version;
+  // npm rejects 4 components, so package.json carries the 3-digit translation.
+  assert(
+    pkg === v.split(".").slice(0, 3).join("."),
+    `package.json ${pkg} does not match VERSION ${v}`,
+  );
+});
+
 check("every brand SVG referenced by the generator exists", () => {
   const gen = read("scripts/build-brand-assets.mjs");
   const refs = [...gen.matchAll(/"((?:logo|pattern)\/[^"]+\.svg)"/g)].map((m) => m[1]);
@@ -225,7 +337,9 @@ check("every brand SVG referenced by the generator exists", () => {
 
 check("all four auth pages share the layout", () => {
   const dir = resolve(root, "kindeSrc/environment/pages/(kinde)");
-  const pages = readdirSync(dir);
+  const pages = readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name);
   assert(pages.length >= 3, `expected >=3 page dirs, saw ${pages.join(", ")}`);
   for (const p of pages) {
     const src = read(`kindeSrc/environment/pages/(kinde)/${p}/page.tsx`);

@@ -467,4 +467,8 @@ export const getStyles = (): string => `
     }
     .gph-footer nav { gap: 1.25rem; }
   }
+
+  /* gph-end-of-stylesheet — the truncation canary in scripts/verify.tsx asserts
+   * this marker survives. Keep it last. A stray backtick in a comment above will
+   * terminate the template literal and drop everything after it. */
 `;
