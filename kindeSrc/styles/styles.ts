@@ -1,10 +1,33 @@
-import {
-  arrowLeft,
-  arrowRight,
-  figtreeLatin,
-  figtreeLatinExt,
-  glidePathWhite,
-} from "../assets/brand-assets";
+import { arrowLeft, arrowRight, glidePathWhite } from "../assets/brand-assets";
+
+/**
+ * Where the Figtree woff2 subsets are served from.
+ *
+ * Must be a glidepathhealth.com host. The auth origin's CSP is
+ *   font-src 'self' glidepathhealth.com *.glidepathhealth.com
+ * and the wildcard matches at any depth, so app.dev., app.staging. and a
+ * dedicated assets. host are all permitted; any other CDN is not.
+ *
+ * One URL is used by every Kinde environment on purpose. The font is brand and
+ * is byte-identical everywhere, so there is nothing to isolate per environment,
+ * and a single host means no environment detection at render time. (There is no
+ * good signal for it anyway: domains.kindeDomain exists only on Kinde workflow
+ * events, not page events.)
+ *
+ * Do NOT point this at the app's Vite output, e.g.
+ * /assets/figtree-latin-CEHu_veL.woff2 — that filename is a content hash served
+ * immutable, it already differs per environment, and it would break silently on
+ * the next app deploy. The path below has to be published deliberately.
+ *
+ * The host must also return Access-Control-Allow-Origin for the auth origin:
+ * @font-face is a CORS fetch even when the CSP allows the host.
+ */
+export const FONT_HOST = "https://assets.glidepathhealth.com";
+const fontUrl = {
+  latin: `${FONT_HOST}/brand/figtree-latin.woff2`,
+  latinExt: `${FONT_HOST}/brand/figtree-latin-ext.woff2`,
+} as const;
+
 
 /**
  * Glidepath Health design tokens.
@@ -41,9 +64,10 @@ const brand = {
  * "Segoe UI" truncated mid-value and every page fell back to the browser
  * default serif. scripts/verify.tsx now fails on any quote in the output.
  *
- * Area is the brand guide's primary typeface but ships via Adobe Fonts, and the
- * auth origin does not load cross-origin fonts, so it cannot be served here at
- * all. Figtree is the guide's sanctioned fallback.
+ * Area is the brand guide's primary typeface but ships via Adobe Fonts, whose
+ * hosts are absent from the auth origin's font-src and style-src allowlists, so
+ * it cannot load there. Cross-origin is fine per se — see FONT_HOST above; the
+ * host allowlist is the constraint. Figtree is the sanctioned fallback.
  */
 const fontStack = `Figtree, Helvetica, Arial, sans-serif`;
 
@@ -56,20 +80,22 @@ const scale = {
 
 export const getStyles = (): string => `
   /*
-   * Figtree, embedded. The Kinde auth origin does not load cross-origin
-   * subresources — a FontFace pointing at fonts.gstatic.com fails there and the
-   * same load succeeds from any other origin — so a hotlinked CDN font silently
-   * leaves the page on the browser default serif.
+   * Figtree, from FONT_HOST. There is deliberately no data: fallback.
    *
-   * No format() descriptor: it requires a quoted string and browsers sniff the
-   * format from the data URI anyway.
+   * The auth origin's CSP is font-src 'self' glidepathhealth.com
+   * *.glidepathhealth.com, with no data:, so an embedded copy is rejected every
+   * time and is not a usable fallback. A CDN font is blocked for the same
+   * reason. A glidepathhealth.com host is the only shape that works.
+   *
+   * No format() descriptor: it requires a quoted string, which does not survive
+   * Kinde's escaping, and browsers sniff the format anyway.
    */
   @font-face {
     font-family: Figtree;
     font-style: normal;
     font-weight: 300 900;
     font-display: swap;
-    src: url(${figtreeLatin});
+    src: url(${fontUrl.latin});
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
   @font-face {
@@ -77,7 +103,7 @@ export const getStyles = (): string => `
     font-style: normal;
     font-weight: 300 900;
     font-display: swap;
-    src: url(${figtreeLatinExt});
+    src: url(${fontUrl.latinExt});
     unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
   }
 

@@ -1,6 +1,8 @@
 // Regenerates kindeSrc/assets/brand-assets.ts from the official SVGs in
-// kindeSrc/assets/brand/. Kinde does not host static assets, so the artwork has
-// to travel with the page as base64 data URIs. Encoding the files verbatim also
+// kindeSrc/assets/brand/. The auth origin's CSP allows data: for img-src, so the
+// artwork travels with the page as base64 data URIs. Fonts deliberately do NOT:
+// font-src has no data:, so an embedded woff2 can never load. Figtree is served
+// from FONT_HOST in styles.ts instead. Encoding the files verbatim also
 // satisfies the brand guide's rule that the logo and Glide Path pattern are only
 // ever composited from the official files, never redrawn.
 //
@@ -21,24 +23,11 @@ const assets = {
   glidePathWhite: "pattern/glide-path-white.svg",
 };
 
-// Figtree has to travel with the page too. The Kinde auth origin does not load
-// cross-origin fonts (measured: a FontFace from fonts.gstatic.com fails there and
-// succeeds from any other origin), so hotlinking a CDN leaves the page on the
-// browser default serif.
 // Interface glyphs this repo draws itself, kept apart from the brand kit.
 const ui = {
   arrowRight: "../ui/arrow-right.svg",
   arrowLeft: "../ui/arrow-left.svg",
 };
-
-const fonts = {
-  figtreeLatin: "fonts/Figtree-latin.woff2",
-  figtreeLatinExt: "fonts/Figtree-latin-ext.woff2",
-};
-
-const fontUri = (rel) =>
-  "data:font/woff2;base64," +
-  readFileSync(resolve(root, "kindeSrc/assets/brand", rel)).toString("base64");
 
 const body = [
   ...Object.entries(assets).map(
@@ -46,9 +35,6 @@ const body = [
   ),
   ...Object.entries(ui).map(
     ([name, rel]) => `// ui/${rel.replace("../ui/", "")}\nexport const ${name} = "${dataUri(rel)}";`,
-  ),
-  ...Object.entries(fonts).map(
-    ([name, rel]) => `// ${rel}\nexport const ${name} = "${fontUri(rel)}";`,
   ),
 ].join("\n\n");
 

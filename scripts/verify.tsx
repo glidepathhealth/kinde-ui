@@ -57,6 +57,35 @@ const assert = (cond: unknown, msg: string) => {
 
 const css = getStyles();
 
+/**
+ * What the auth origin's CSP will actually fetch.
+ *
+ *   img-src   'self' glidepathhealth.com *.glidepathhealth.com data: ...
+ *   font-src  'self' glidepathhealth.com *.glidepathhealth.com
+ *   style-src 'self' glidepathhealth.com *.glidepathhealth.com ... 'unsafe-inline'
+ *
+ * Anything else is blocked with no network error surfaced. The authority must
+ * end at /, ?, # or end-of-string, so glidepathhealth.com.evil.com,
+ * evilglidepathhealth.com and glidepathhealth.com@evil.com all fail while a
+ * bare origin (what <link rel=preconnect> carries) passes. Case-insensitive:
+ * hosts are, and rejecting a legal uppercase one is a false alarm. A single
+ * leading slash is root-relative and covered by 'self'; two is
+ * protocol-relative and resolves cross-origin. Fonts additionally reject data:,
+ * which font-src omits — the font check handles that.
+ */
+const brandHost = /^https:\/\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*glidepathhealth\.com([/?#]|$)/i;
+const allowedSubresource = new RegExp(
+  `^(data:|/(?!/)|#|${brandHost.source.slice(1)})`,
+  "i",
+);
+/**
+ * Fonts are stricter than the rest. `'self'` and a root-relative path are
+ * CSP-legal but useless here — Kinde serves no static files from this repo — and
+ * a #fragment never fetches at all. Only an absolute brand host can actually
+ * deliver the woff2, so the font check uses this, not allowedSubresource.
+ */
+const allowedFontSrc = brandHost;
+
 const renderPage = (variant?: string, opts: { isRtl?: boolean } = {}) => {
   const context = {
     widget: {
@@ -208,7 +237,7 @@ check("the emitted CSS contains no quote characters at all", () => {
   );
 });
 
-check("Figtree is the font and it is embedded, not hotlinked", () => {
+check("Figtree leads the stack and loads from a CSP-allowed host", () => {
   const m = css.match(/--kinde-base-font-family:\s*([^;]+);/);
   assert(m, "--kinde-base-font-family not set");
   const stack = m![1];
@@ -220,14 +249,156 @@ check("Figtree is the font and it is embedded, not hotlinked", () => {
       `font family needs quoting and so cannot be used here: ${family}`,
     );
   }
-  // The auth origin does not load cross-origin subresources, so a CDN URL here
-  // would leave the page on the browser default serif.
-  const faces = [...css.matchAll(/@font-face\s*\{[^}]*\}/g)].map((x) => x[0]);
-  assert(faces.length >= 1, "no @font-face rule: Figtree would never load");
+  // The auth origin's CSP is `font-src 'self' glidepathhealth.com
+  // *.glidepathhealth.com`. It has no `data:`, so an embedded font is rejected;
+  // and it lists no other host, so any third-party CDN is rejected too. This
+  // check used to assert `url(data:font` — the exact thing CSP blocks — which
+  // kept the suite green while the font did not render. Assert the CSP instead.
+  // Strip comments before matching: a commented-out `src:` whose url() stayed
+  // inside the comment satisfied this check while the face had no source.
+  const faces = [
+    ...css
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .matchAll(/@font-face\s*\{[^}]*\}/gi),
+  ].map((x) => x[0]);
+  // Exactly two: the latin and latin-ext subsets. `>= 1` let the ext subset be
+  // deleted, which drops every ä/ł/ś/ż/ő to Helvetica mid-word.
+  assert(
+    faces.length === 2,
+    `expected the latin and latin-ext subsets, found ${faces.length} @font-face rules`,
+  );
+  const primaries: string[] = [];
   for (const face of faces) {
+    // EVERY src descriptor, not the first. A later `src:` replaces the earlier
+    // one outright in CSS, so reading only the first let a re-embedded data:
+    // font ride along in a second descriptor and win — the exact regression the
+    // per-url loop below exists to stop.
+    const srcDecls = [...face.matchAll(/src:\s*([^;}]+)/gi)].map((x) => x[1]);
+    assert(srcDecls.length > 0, `@font-face has no src descriptor: ${face.slice(0, 60)}`);
     assert(
-      /src:\s*url\(data:font/.test(face),
-      "@font-face must embed the font; a remote URL does not load on the auth origin",
+      srcDecls.length === 1,
+      `@font-face has ${srcDecls.length} src descriptors; the last one wins and the rest are dead`,
+    );
+    // Check the raw face for an embedded font before parsing srcs: a real
+    // base64 URI contains `;base64`, and the descriptor capture stops at that
+    // semicolon, so srcs comes back empty and the generic no-url() message
+    // fires instead of the one naming the actual mistake.
+    assert(
+      !/url\(\s*data:/i.test(face),
+      "@font-face cannot use a data: URI: CSP font-src has no data:, so it never loads. Serve it from a glidepathhealth.com host.",
+    );
+    const srcs = srcDecls.flatMap((d) =>
+      [...d.matchAll(/url\(([^)]+)\)/gi)].map((x) => x[1].trim()),
+    );
+    assert(srcs.length > 0, `@font-face src has no url(): ${face.slice(0, 60)}`);
+    // Every source, not just the first. A data: URI is not a usable fallback
+    // here — font-src rejects it every time — so an embedded copy is pure page
+    // weight plus a guaranteed console violation. Re-embedding is the specific
+    // mistake this guards, since it looks like the safe option.
+    for (const s of srcs) {
+      assert(
+        allowedFontSrc.test(s),
+        `@font-face needs an absolute https://<host>.glidepathhealth.com URL — a root-relative path or #fragment passes CSP but fetches nothing here; got: ${s.slice(0, 70)}`,
+      );
+      assert(/\.woff2(\?|#|$)/.test(s), `@font-face src is not a woff2: ${s.slice(0, 70)}`);
+    }
+    primaries.push(srcs[0]);
+    // format() needs a quoted string, which Kinde's escaping destroys.
+    assert(!/format\(/i.test(face), "format() needs quotes and cannot be used here");
+    assert(
+      /font-display:\s*swap/i.test(face),
+      "font-display: swap missing: login text stays invisible until the font arrives",
+    );
+    assert(
+      /unicode-range:\s*U\+/i.test(face),
+      "unicode-range missing: this subset claims every codepoint and the other never loads",
+    );
+    // The declared range has to keep matching the variable woff2 that gets
+    // published. Narrowing it here, or publishing a static instance, faux-bolds
+    // the 600 labels and the 700 heading with no console error.
+    assert(
+      /font-weight:\s*300\s+900/i.test(face),
+      "font-weight must stay 300 900 to match the variable woff2 published at FONT_HOST",
+    );
+    // Bind the face to what the stack actually asks for. Two valid .woff2 URLs
+    // under font-family: Other, or font-style: italic, satisfy every other
+    // assertion here while the page still falls back to Helvetica.
+    assert(
+      /font-family:\s*Figtree\s*[;}]/i.test(face),
+      "@font-face must declare font-family: Figtree, which is what the stack requests",
+    );
+    assert(
+      /font-style:\s*normal\s*[;}]/i.test(face),
+      "@font-face must declare font-style: normal; an italic face never matches the body text",
+    );
+    // Kinde HTML-escapes the sheet; & becomes &amp; and that ; terminates the
+    // declaration. The .woff2(\?|#|$) allowance above invites query strings,
+    // which is exactly where & shows up.
+    assert(!/[&<]/.test(face), "& or < in an @font-face does not survive Kinde's escaping");
+  }
+  assert(
+    new Set(primaries).size === primaries.length,
+    `both @font-face rules share a src, so one subset never loads: ${primaries.join(", ")}`,
+  );
+});
+
+check("every subresource in the sheet is a data: URI or a glidepathhealth.com host", () => {
+  // The CSP that governs @font-face governs img-src and style-src too. A remote
+  // background-image is blocked with no network error surfaced — the exact
+  // silent failure this suite exists for, and previously unguarded: only
+  // @font-face was checked. data: is allowed here because img-src lists it;
+  // font-src does not, which the font check above handles separately.
+  // Case-insensitive: CSS function names and at-keywords are ASCII
+  // case-insensitive, so URL(...) and @IMPORT are valid and get fetched.
+  const sheet = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const urls = [...sheet.matchAll(/url\(([^)]+)\)/gi)].map((m) => m[1].trim());
+  assert(urls.length > 0, "no url() at all; did the artwork stop being embedded?");
+  const blocked = urls.filter((u) => !allowedSubresource.test(u));
+  assert(
+    blocked.length === 0,
+    `CSP blocks these subresources (data: or a glidepathhealth.com host only): ${blocked
+      .map((u) => u.slice(0, 60))
+      .join(" | ")}`,
+  );
+  assert(
+    !/@import/i.test(sheet),
+    "@import pulls a cross-origin stylesheet, which style-src blocks",
+  );
+});
+
+check("every subresource in the rendered HTML is CSP-allowed", () => {
+  // The stylesheet is not the only way a blocked URL gets in: header.tsx renders
+  // the logo as an <img src>. Cover every carrier that triggers a fetch, not just
+  // src/href — an inline style attribute is checked by nothing else, since the
+  // sheet check only reads getStyles(). href is scoped to <link> and SVG
+  // <use>/<image>: CSP does not govern <a> navigation, and flagging an outbound
+  // link as a blocked subresource would be a false alarm with a wrong diagnosis.
+  for (const variant of [undefined, "login"]) {
+    const html = renderPage(variant);
+    const candidates = [
+      ...[...html.matchAll(/\ssrc="([^"]+)"/gi)].map((m) => m[1]),
+      // srcset is a comma-separated candidate list; each URL is fetchable, so
+      // validating the raw string would let a blocked candidate ride behind an
+      // allowed first one.
+      ...[...html.matchAll(/\ssrcset="([^"]+)"/gi)].flatMap((m) =>
+        m[1]
+          .split(",")
+          .map((c) => c.trim().split(/\s+/)[0])
+          .filter(Boolean),
+      ),
+      ...[...html.matchAll(/<(?:link|use|image)\b[^>]*\shref="([^"]+)"/gi)].map((m) => m[1]),
+      ...[...html.matchAll(/<object\b[^>]*\sdata="([^"]+)"/gi)].map((m) => m[1]),
+      // url() inside any inline style attribute.
+      ...[...html.matchAll(/\sstyle="([^"]*)"/gi)].flatMap((m) =>
+        [...m[1].matchAll(/url\(([^)]+)\)/gi)].map((u) => u[1].trim()),
+      ),
+    ];
+    const blocked = candidates.filter(
+      (u) => !(allowedSubresource.test(u) || /^@[0-9a-f]{32}@/.test(u)),
+    );
+    assert(
+      blocked.length === 0,
+      `CSP blocks these page subresources (variant=${variant}): ${blocked.join(", ")}`,
     );
   }
 });
