@@ -587,6 +587,51 @@ check("VERSION and package.json describe the same release", () => {
   );
 });
 
+check("package.json security overrides are honoured by the lockfile", () => {
+  // @kinde/infrastructure 0.2.2 declares its build tooling (vite-plugin-dts,
+  // prettier, @types/node) as runtime dependencies, so ~89 packages we never
+  // execute land under `dependencies` and Dependabot scopes their CVEs
+  // `runtime`. The overrides in package.json pin the vulnerable ones forward.
+  //
+  // Nothing else checks the lockfile: `npm install` after an edit that drops or
+  // stops matching an override silently reintroduces the vulnerable version, and
+  // the alerts only come back on the next push. Offline and self-maintaining —
+  // it reads whatever overrides package.json declares rather than a hardcoded
+  // list, so it does not go stale when they change.
+  const pkg = JSON.parse(read("package.json"));
+  const lock = JSON.parse(read("package-lock.json"));
+  const overrides: Record<string, string> = pkg.overrides ?? {};
+  assert(Object.keys(overrides).length > 0, "package.json declares no overrides");
+
+  const parse = (v: string) =>
+    (v.replace(/^[\^~>=<\s]*/, "").split("-")[0].split(".").map(Number).concat([0, 0, 0])).slice(0, 3);
+  const gte = (a: number[], b: number[]) =>
+    a[0] !== b[0] ? a[0] > b[0] : a[1] !== b[1] ? a[1] > b[1] : a[2] >= b[2];
+
+  // name -> floors, one per major line the overrides pin.
+  const floors = new Map<string, number[][]>();
+  for (const [key, want] of Object.entries(overrides)) {
+    const name = key.startsWith("@") ? "@" + key.slice(1).split("@")[0] : key.split("@")[0];
+    floors.set(name, [...(floors.get(name) ?? []), parse(want)]);
+  }
+
+  const stale: string[] = [];
+  for (const [path, meta] of Object.entries<{ version?: string }>(lock.packages ?? {})) {
+    const name = path.split("node_modules/").pop();
+    if (!name || !meta.version || !floors.has(name)) continue;
+    const got = parse(meta.version);
+    // Compare against the floor for this major; an unpinned major is out of scope.
+    const floor = floors.get(name)!.find((f) => f[0] === got[0]);
+    if (floor && !gte(got, floor)) {
+      stale.push(`${name}@${meta.version} < ${floor.join(".")} (${path})`);
+    }
+  }
+  assert(
+    stale.length === 0,
+    `lockfile has versions below their package.json override; run npm install and commit the lockfile: ${stale.join(", ")}`,
+  );
+});
+
 check("every brand SVG referenced by the generator exists", () => {
   const gen = read("scripts/build-brand-assets.mjs");
   const refs = [...gen.matchAll(/"((?:logo|pattern)\/[^"]+\.svg)"/g)].map((m) => m[1]);
