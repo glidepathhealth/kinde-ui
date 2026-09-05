@@ -56,7 +56,7 @@ unclear which of the three a change should target, ask rather than guess.
 
 Run `npm install` first — `node_modules` is not checked in and `tsx` comes from it.
 
-- `npm test` — run before every commit. 20 checks, all green on a clean tree, so
+- `npm test` — run before every commit. 21 checks, all green on a clean tree, so
   a failure is yours. No watch mode and no single-check selection.
 - `npm run typecheck` — `tsc --noEmit`. Does **not** cover
   `scripts/build-brand-assets.mjs` (`.mjs` is outside `include`).
@@ -163,7 +163,7 @@ No build, lint or CI. `tsconfig.json` still carries inert Next.js residue
   exclusion is a hardcoded list of `(register)` and `(default)`, not a directory
   scan — copy `(login)/page.tsx` into a new flow and forget to drop
   `variant="login"` and the login-only button-row override silently applies
-  there with all 20 checks green.
+  there with all 21 checks green.
 - Keep the inline `<style>` **after** `getKindeRequiredCSS()` in `root.tsx`'s
   `<head>`, or every `--kinde-*` override loses the cascade with no error.
 - Kinde helpers return opaque `@<32 hex>@` placeholders substituted after your
@@ -197,8 +197,17 @@ type.
   must be the three-component truncation (`0.1.1`) — npm rejects four. `npm test`
   enforces that pair.
 - **Never run `npm version`.** Edit `VERSION` and `package.json` together, then
-  `npm install` so `package-lock.json` follows — nothing checks the lockfile, so
-  that drift is silent. `/ship` does the bump for you; do not also hand-edit.
+  `npm install` so `package-lock.json` follows. `/ship` does the bump for you; do
+  not also hand-edit.
+- **Do not delete the `overrides` block in `package.json`.** It is not stale
+  cruft. `@kinde/infrastructure@0.2.2` declares its build tooling
+  (`vite-plugin-dts`, `prettier`, `@types/node`) as *runtime* dependencies, so
+  ~89 packages we never execute land under `dependencies` and every CVE in that
+  subtree is reported against this repo. The overrides pin the vulnerable ones
+  forward. Removing them, or regenerating the lockfile without them, silently
+  reopens all of it — which is why *package.json security overrides are honoured
+  by the lockfile* exists as a check. `@types/node` is a direct devDependency for
+  the same reason: it used to arrive by accident through that subtree.
 - `CHANGELOG.md`: `## [0.1.1.0] - YYYY-MM-DD` with the full four-component
   version, newest first, `### Added/Changed/Fixed`, prose bullets. No
   `[Unreleased]` section. There are no git tags — VERSION and CHANGELOG are the

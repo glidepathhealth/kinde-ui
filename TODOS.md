@@ -141,6 +141,36 @@ anyway: `domains.kindeDomain` exists only on Kinde workflow events, not page
 events, and `request.authUrlParams` (which carries `clientId` and `redirectUri`)
 is not populated on every route — `route.path` can be `account` or `/`.
 
+### Move to @kinde/infrastructure 0.11.x
+
+**Priority:** P2
+
+We are pinned to `0.2.2`. `0.11.1` has **zero runtime dependencies**, which would
+delete ~89 packages and the entire CVE surface the `overrides` block currently
+holds back — that block, and the lockfile check guarding it, both exist only to
+work around 0.2.2 declaring build tooling as runtime dependencies.
+
+It is not a drop-in. `WidgetContent` was renamed to camelCase with no snake_case
+fallback:
+
+| 0.2.2 | 0.11.1 |
+|---|---|
+| `content.logo_alt` | `content.logoAlt` |
+| `content.page_title` | `content.pageTitle` |
+
+That touches all three `page.tsx` files and `root.tsx` — the code `npm test` never
+executes. `npm run typecheck` does flag every site, so the rename itself is
+mechanical and safe to make.
+
+The risk is the runtime, not the types. `kinde.json` pins Kinde's API version at
+`2024-12-09`. If the runtime at that version still sends snake_case, renaming the
+code yields `undefined` alt text and an empty `<title>` with no error anywhere.
+**Verify against a real Kinde dashboard preview before landing**, and check
+whether `kinde.json` needs to move in lockstep. Confirmed already: all six
+symbols we import (`getKindeWidget`, `getKindeCSRF`, `getKindeRequiredCSS`,
+`getKindeRequiredJS`, `getSVGFaviconUrl`, `KindePageEvent`) still exist in
+0.11.1, and `npm install` + `npm audit` come back clean on it.
+
 ### Drop the two unused brand-asset exports
 
 **Priority:** P3
