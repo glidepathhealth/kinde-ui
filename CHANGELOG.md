@@ -2,6 +2,53 @@
 
 All notable changes to the Glidepath Health Kinde custom UI.
 
+## [0.1.2.0] - 2026-09-04
+
+### Fixed
+
+The Figtree webfont never loaded in production, and v0.1.1.0's fix could not have
+made it load. That release correctly identified Kinde's HTML-escaping of the
+stylesheet and embedded the font as a base64 `data:` URI to avoid a quoted
+`format()` and a cross-origin CDN. Both problems were real. But the auth origin
+serves a Content-Security-Policy whose `font-src` is
+
+```
+font-src 'self' glidepathhealth.com *.glidepathhealth.com
+```
+
+with no `data:`, so the embedded copy was rejected on every page load and the
+login page fell back to Helvetica — the same visible symptom v0.1.1.0 set out to
+fix, one step further down. Measured against the live policy: a `data:` font and
+a `fonts.gstatic.com` font both raise a `font-src` violation, while a URL on a
+`glidepathhealth.com` host is allowed at any subdomain depth.
+
+- `@font-face` now points at `FONT_HOST` (`assets.glidepathhealth.com`) with no
+  `data:` fallback. A fallback CSP rejects every time is not a fallback; it was
+  ~41KB on every page load plus a guaranteed console violation.
+- The font files were removed from the repo. They were byte-identical to the two
+  subsets the product app already builds and ships, so this repo held a second
+  copy of an artifact with a record elsewhere. `brand-assets.ts` drops from 72KB
+  to 31KB.
+- `<link rel=preconnect>` for the font host, since the font is only discovered
+  once the inline stylesheet parses.
+
+**`FONT_HOST` is not serving yet, so the page still renders Helvetica.** That is
+unchanged from before this release rather than a regression — the embedded font
+was already blocked. Standing up the host, its CORS header and the OFL licence
+is tracked in `TODOS.md` and in GN-129.
+
+### Changed
+
+- `npm test` grew from 18 checks to 20 and no longer asserts the bug. The old
+  `@font-face` check required `src: url(data:font…)` — precisely what the CSP
+  blocks — so it stayed green while the font did not render. It now enforces the
+  CSP: every `@font-face` source must be an absolute `glidepathhealth.com` URL,
+  and two new checks extend that to every `url()` in the emitted stylesheet and
+  every subresource in the rendered HTML.
+- Added `CLAUDE.md`: the branch model (`develop` → `staging` → `main`, with
+  `main` being production via Kinde Git Sync), the silent-failure constraints,
+  and the release conventions.
+
 ## [0.1.1.0] - 2026-09-04
 
 ### Fixed
