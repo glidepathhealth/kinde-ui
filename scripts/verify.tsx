@@ -594,12 +594,18 @@ check("every brand SVG referenced by the generator exists", () => {
   for (const r of refs) readFileSync(resolve(root, "kindeSrc/assets/brand", r));
 });
 
-check("all four auth pages share the layout", () => {
+check("every auth page shares the layout", () => {
   const dir = resolve(root, "kindeSrc/environment/pages/(kinde)");
   const pages = readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => e.name);
-  assert(pages.length >= 3, `expected >=3 page dirs, saw ${pages.join(", ")}`);
+  // Three directories today: (default), (login), (register). The check used to
+  // be named for four and assert >= 3, which overstated what it covers. Adding a
+  // directory is deliberate, so make it say so rather than pass silently.
+  assert(
+    pages.length === 3,
+    `expected 3 page dirs, saw ${pages.length}: ${pages.join(", ")}. Adding a flow? Update this count and check the variant="login" exclusion list above.`,
+  );
   for (const p of pages) {
     const src = read(`kindeSrc/environment/pages/(kinde)/${p}/page.tsx`);
     assert(src.includes("DefaultLayout"), `${p} does not use DefaultLayout`);
