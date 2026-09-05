@@ -99,7 +99,8 @@ kindeSrc/
   styles/styles.ts          brand tokens and Kinde setting overrides
   assets/
     brand/                  official brand kit (see its README)
-    brand-assets.ts         generated: brand SVGs as data URIs
+    ui/                     interface glyphs this repo draws (see its README)
+    brand-assets.ts         generated: brand and UI SVGs as data URIs
   environment/pages/(kinde)/
     (default)/page.tsx      every flow without its own page
     (login)/page.tsx        sign in
@@ -184,7 +185,9 @@ Two consequences:
 there is no point carrying one, since `font-src` rejects it every time.
 **That host is not up yet**, so the type is currently Helvetica; see the P0 in
 `TODOS.md`. Change `FONT_HOST` if a different host is chosen — any
-`glidepathhealth.com` subdomain at any depth is permitted.
+`glidepathhealth.com` subdomain at any depth is permitted. It is one constant:
+`root.tsx` imports it for the `<link rel=preconnect>` in the head, so changing
+it in `styles.ts` moves both.
 
 No font files live in this repo. They used to, and the copies were
 byte-identical to the two subsets the product app already builds and ships, so

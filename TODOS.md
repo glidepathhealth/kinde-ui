@@ -47,6 +47,7 @@ the answer, and `npm test` requires it to lead the stack.
 ### Serve Figtree from a glidepathhealth.com host — the embedded font is blocked
 
 **Priority:** P0
+**Tracked:** GN-129 — https://glidepathhealth.atlassian.net/browse/GN-129
 
 The CSP on the live auth page is
 
