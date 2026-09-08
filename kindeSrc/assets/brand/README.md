@@ -18,13 +18,13 @@ pattern/
   gradient-digital.svg             brand gradient, Midnight -> Dusk -> Dawn -> Horizon
   glide-path-white.svg             Glide Path line pattern, white strokes
   glide-path-midnight.svg          Glide Path line pattern, midnight strokes
-fonts/
-  Figtree-latin.woff2              embedded into the stylesheet by npm run assets
-  Figtree-latin-ext.woff2
-  Figtree-VariableFont_wght.ttf    full variable font, for design tools
-  Figtree-Italic-VariableFont_wght.ttf
-  OFL.txt                          Figtree's licence
 ```
+
+No font files live here. Figtree is served to the auth pages from `FONT_HOST`
+(see `kindeSrc/styles/styles.ts`), and the same two woff2 subsets are already
+built and shipped by the product app — the copies this repo used to carry were
+byte-identical duplicates of the app's. Get them from the app, or from Google
+Fonts, which is Figtree's upstream and where its OFL licence lives.
 
 `../ui/` holds interface glyphs this repo draws itself (the link arrow). Those
 are not brand assets and are not covered by the no-redraw rule.
@@ -47,18 +47,25 @@ contrast is short.
 
 ## Type
 
-**Figtree**, matching the product app, embedded as base64 woff2.
+**Figtree**, matching the product app. Served from `FONT_HOST` (see
+`kindeSrc/styles/styles.ts`), not embedded and not stored here.
 
 The brand guide's primary typeface is **Area** (Adobe Fonts, subscription, not
 redistributable). It cannot be used on the hosted auth pages at all: those pages
-do not load cross-origin subresources, so an Adobe Fonts web project would never
-resolve. Figtree is the guide's sanctioned fallback and is what renders.
+run a CSP whose `font-src` and `style-src` allow only `'self'` and
+`glidepathhealth.com` hosts, so an Adobe Fonts web project is blocked outright.
+Figtree is the guide's sanctioned fallback and is what will render once
+`FONT_HOST` is serving. Until then the page is Helvetica, which ships only
+300/400/700 — so the 600-weight labels and buttons render as Helvetica Bold and
+the 500-weight link as Regular, flattening the weight hierarchy the Figma frame
+designs. Measure type against Figtree, not against what you currently see.
 
-Two constraints the CSS has to respect, both measured against the live dev page:
+Two constraints the CSS has to respect, both measured against the live auth page:
 
-- **The font must be embedded, not hotlinked.** A `FontFace` pointing at
-  `fonts.gstatic.com` fails on the auth origin and succeeds from anywhere else.
-  A CDN URL leaves the page on the browser default serif.
+- **The font must load from a `glidepathhealth.com` host.** `font-src` allows
+  `'self'` and `glidepathhealth.com`/`*.glidepathhealth.com`, and nothing else —
+  not `fonts.gstatic.com`, and not a `data:` URI, so embedding does not work
+  either. Anything else leaves the page on the browser default.
 - **No quote characters anywhere in the stylesheet.** Kinde HTML-escapes it, and
   the `;` inside the resulting `&quot;` terminates whatever declaration it lands
   in. That means no quoted family names (so no `"Segoe UI"`), no `format('woff2')`,

@@ -8,7 +8,7 @@ import {
   type KindePageEvent,
 } from "@kinde/infrastructure";
 import React from "react";
-import { getStyles } from "./styles/styles";
+import { FONT_HOST, getStyles } from "./styles/styles";
 interface RootProps extends KindePageEvent {
   children: React.ReactNode;
 }
@@ -30,6 +30,16 @@ export const Root = ({
         <title>{context.widget.content.page_title}</title>
 
         <link href={getSVGFaviconUrl()} rel="icon" type="image/svg+xml" />
+        {/*
+          * The font lives on another origin and is only discovered once the
+          * inline stylesheet parses, so its first byte waits on a cold DNS +
+          * TCP + TLS handshake. preconnect overlaps that with HTML parse.
+          * Not preload: that would force the latin-ext subset on every user,
+          * which unicode-range otherwise avoids. crossOrigin is required —
+          * font fetches are CORS requests, and without it this warms the
+          * wrong connection and the font fetches twice.
+          */}
+        <link crossOrigin="anonymous" href={FONT_HOST} rel="preconnect" />
         {getKindeRequiredCSS()}
         {getKindeRequiredJS()}
         {/*
