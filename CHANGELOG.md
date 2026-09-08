@@ -2,6 +2,98 @@
 
 All notable changes to the Glidepath Health Kinde custom UI.
 
+## [0.1.3.0] - 2026-09-04
+
+### Security
+
+Cleared all 22 Dependabot alerts (14 high, 6 moderate, 2 low). Every one traced
+to a single upstream packaging bug rather than to anything this repo imports:
+`@kinde/infrastructure@0.2.2` declares its build tooling — `vite-plugin-dts`,
+`prettier`, `@types/node` — as *runtime* `dependencies`. That drags in
+`@microsoft/api-extractor`, `@vue/language-core` and `@rollup/pluginutils`, about
+89 packages we never execute, and every CVE in that subtree gets reported against
+this repo with `runtime` scope.
+
+None of the four direct dependencies was flagged. The alerts were ReDoS and glob
+matching issues in `lodash`, `minimatch`, `picomatch`, `brace-expansion` and
+`ajv`.
+
+- `overrides` in `package.json` pin the affected packages forward, scoped per
+  major so both live lines stay on their own track: `minimatch` resolves 3.1.5
+  and 9.0.9, `brace-expansion` 1.1.18 and 2.1.4. `npm audit` and `npm audit`
+  after a clean `npm ci` both report 0 vulnerabilities.
+- `@types/node` is now a direct devDependency. It had been arriving by accident
+  through the same `@kinde/infrastructure` subtree, so the scripts' `node:*`
+  imports and `process`/`Buffer` types depended on an upstream packaging mistake.
+
+### Added
+
+- `npm test` grew a 21st check: *package.json security overrides are honoured by
+  the lockfile*. Nothing else reads `package-lock.json`, so an `npm install` that
+  drops or stops matching an override silently reintroduces the vulnerable
+  version and the alerts only reappear on the next push. The check is offline and
+  reads whatever overrides `package.json` declares, so it does not go stale when
+  they change. Verified against three drift modes: a reverted lockfile entry, a
+  deleted `overrides` block, and a regression confined to one major line.
+
+### Notes
+
+Not taken: `@kinde/infrastructure@0.11.1` has zero runtime dependencies and would
+delete this whole problem rather than pin around it. It renames `WidgetContent`
+to camelCase with no snake_case fallback (`logo_alt` to `logoAlt`, `page_title`
+to `pageTitle`), which is a runtime contract change with Kinde's servers in the
+files `npm test` never executes. `kinde.json` pins the API version at
+`2024-12-09`; if that runtime still sends snake_case, the rename yields undefined
+alt text and an empty title with no error anywhere. Tracked in `TODOS.md` as P2,
+gated on a real Kinde dashboard preview.
+
+## [0.1.2.0] - 2026-09-04
+
+### Fixed
+
+The Figtree webfont never loaded in production, and v0.1.1.0's fix could not have
+made it load. That release correctly identified Kinde's HTML-escaping of the
+stylesheet and embedded the font as a base64 `data:` URI to avoid a quoted
+`format()` and a cross-origin CDN. Both problems were real. But the auth origin
+serves a Content-Security-Policy whose `font-src` is
+
+```
+font-src 'self' glidepathhealth.com *.glidepathhealth.com
+```
+
+with no `data:`, so the embedded copy was rejected on every page load and the
+login page fell back to Helvetica — the same visible symptom v0.1.1.0 set out to
+fix, one step further down. Measured against the live policy: a `data:` font and
+a `fonts.gstatic.com` font both raise a `font-src` violation, while a URL on a
+`glidepathhealth.com` host is allowed at any subdomain depth.
+
+- `@font-face` now points at `FONT_HOST` (`assets.glidepathhealth.com`) with no
+  `data:` fallback. A fallback CSP rejects every time is not a fallback; it was
+  ~41KB on every page load plus a guaranteed console violation.
+- The font files were removed from the repo. They were byte-identical to the two
+  subsets the product app already builds and ships, so this repo held a second
+  copy of an artifact with a record elsewhere. `brand-assets.ts` drops from 72KB
+  to 31KB.
+- `<link rel=preconnect>` for the font host, since the font is only discovered
+  once the inline stylesheet parses.
+
+**`FONT_HOST` is not serving yet, so the page still renders Helvetica.** That is
+unchanged from before this release rather than a regression — the embedded font
+was already blocked. Standing up the host, its CORS header and the OFL licence
+is tracked in `TODOS.md` and in GN-129.
+
+### Changed
+
+- `npm test` grew from 18 checks to 20 and no longer asserts the bug. The old
+  `@font-face` check required `src: url(data:font…)` — precisely what the CSP
+  blocks — so it stayed green while the font did not render. It now enforces the
+  CSP: every `@font-face` source must be an absolute `glidepathhealth.com` URL,
+  and two new checks extend that to every `url()` in the emitted stylesheet and
+  every subresource in the rendered HTML.
+- Added `CLAUDE.md`: the branch model (`develop` → `staging` → `main`, with
+  `main` being production via Kinde Git Sync), the silent-failure constraints,
+  and the release conventions.
+
 ## [0.1.1.0] - 2026-09-04
 
 ### Fixed
