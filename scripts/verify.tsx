@@ -300,7 +300,11 @@ check("Figtree leads the stack and loads from a CSP-allowed host", () => {
         allowedFontSrc.test(s),
         `@font-face needs an absolute https://<host>.glidepathhealth.com URL — a root-relative path or #fragment passes CSP but fetches nothing here; got: ${s.slice(0, 70)}`,
       );
-      assert(/\.woff2(\?|#|$)/.test(s), `@font-face src is not a woff2: ${s.slice(0, 70)}`);
+      const parsedFontUrl = new URL(s);
+      assert(
+        parsedFontUrl.pathname.endsWith(".woff2"),
+        `@font-face src path is not a woff2: ${s.slice(0, 70)}`,
+      );
     }
     primaries.push(srcs[0]);
     // format() needs a quoted string, which Kinde's escaping destroys.
