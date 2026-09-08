@@ -2,6 +2,51 @@
 
 All notable changes to the Glidepath Health Kinde custom UI.
 
+## [0.1.3.0] - 2026-09-04
+
+### Security
+
+Cleared all 22 Dependabot alerts (14 high, 6 moderate, 2 low). Every one traced
+to a single upstream packaging bug rather than to anything this repo imports:
+`@kinde/infrastructure@0.2.2` declares its build tooling — `vite-plugin-dts`,
+`prettier`, `@types/node` — as *runtime* `dependencies`. That drags in
+`@microsoft/api-extractor`, `@vue/language-core` and `@rollup/pluginutils`, about
+89 packages we never execute, and every CVE in that subtree gets reported against
+this repo with `runtime` scope.
+
+None of the four direct dependencies was flagged. The alerts were ReDoS and glob
+matching issues in `lodash`, `minimatch`, `picomatch`, `brace-expansion` and
+`ajv`.
+
+- `overrides` in `package.json` pin the affected packages forward, scoped per
+  major so both live lines stay on their own track: `minimatch` resolves 3.1.5
+  and 9.0.9, `brace-expansion` 1.1.18 and 2.1.4. `npm audit` and `npm audit`
+  after a clean `npm ci` both report 0 vulnerabilities.
+- `@types/node` is now a direct devDependency. It had been arriving by accident
+  through the same `@kinde/infrastructure` subtree, so the scripts' `node:*`
+  imports and `process`/`Buffer` types depended on an upstream packaging mistake.
+
+### Added
+
+- `npm test` grew a 21st check: *package.json security overrides are honoured by
+  the lockfile*. Nothing else reads `package-lock.json`, so an `npm install` that
+  drops or stops matching an override silently reintroduces the vulnerable
+  version and the alerts only reappear on the next push. The check is offline and
+  reads whatever overrides `package.json` declares, so it does not go stale when
+  they change. Verified against three drift modes: a reverted lockfile entry, a
+  deleted `overrides` block, and a regression confined to one major line.
+
+### Notes
+
+Not taken: `@kinde/infrastructure@0.11.1` has zero runtime dependencies and would
+delete this whole problem rather than pin around it. It renames `WidgetContent`
+to camelCase with no snake_case fallback (`logo_alt` to `logoAlt`, `page_title`
+to `pageTitle`), which is a runtime contract change with Kinde's servers in the
+files `npm test` never executes. `kinde.json` pins the API version at
+`2024-12-09`; if that runtime still sends snake_case, the rename yields undefined
+alt text and an empty title with no error anywhere. Tracked in `TODOS.md` as P2,
+gated on a real Kinde dashboard preview.
+
 ## [0.1.2.0] - 2026-09-04
 
 ### Fixed
