@@ -2,15 +2,6 @@
 
 ## Brand / Auth UI
 
-### Confirm the footer legal URLs
-
-**Priority:** P1
-
-`kindeSrc/components/footer.tsx` links to `glidepathhealth.com/terms`,
-`/privacy` and `/security`. Those paths are assumed — the site is still a
-GoDaddy placeholder, so none of them were verified. Confirm the real URLs
-before this reaches users.
-
 ### Verify the login button row against a real Kinde preview
 
 **Priority:** P1

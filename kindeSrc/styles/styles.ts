@@ -351,32 +351,10 @@ export const getStyles = (): string => `
 
   /* -------------------------------------------------------------- footer -- */
   .gph-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem 2rem;
-    align-items: center;
-    justify-content: space-between;
     padding: 0 var(--gph-gutter) 1.75rem;
     font-size: ${scale.micro};
     line-height: 1.5;
     color: rgba(255, 255, 255, 0.82);
-  }
-
-  .gph-footer nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-  }
-
-  .gph-footer a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .gph-footer a:hover,
-  .gph-footer a:focus-visible {
-    color: ${brand.white};
-    text-decoration: underline;
   }
 
   /* ------------------------------------------------- Kinde widget hooks --
@@ -523,12 +501,6 @@ export const getStyles = (): string => `
     .gph-main { padding: 2rem 1.5rem; }
     .gph-card { border-radius: 0.5rem; }
     .gph-card__heading { font-size: 1.625rem; }
-    .gph-footer {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.75rem;
-    }
-    .gph-footer nav { gap: 1.25rem; }
   }
 
   /* gph-end-of-stylesheet — the truncation canary in scripts/verify.tsx asserts
