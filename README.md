@@ -16,7 +16,7 @@ template; nothing of that theme remains.
   renders comes out on-brand without fighting its markup
 - Styled social sign-in, so turning on Google in the Kinde dashboard produces an
   on-brand button instead of an unstyled one
-- Footer with the copyright line and the Terms, Privacy and Security links
+- Footer with the copyright line
 - Smoke tests for the failures that are silent here (see [Checks](#checks))
 
 ## Prerequisites
